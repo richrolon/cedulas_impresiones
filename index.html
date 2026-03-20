@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Cédula Pro - Rich Rolon</title>
+    <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
+    <script src="https://cdn.jsdelivr.net/gh/ColonelParrot/jscanify@master/src/jscanify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #e9ecef; color: #2c3e50; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+        .status-badge { background: #6c757d; color: white; padding: 8px 15px; border-radius: 50px; font-size: 0.9em; margin-bottom: 20px; display: inline-block; }
+        .upload-card { border: 2px solid #dee2e6; padding: 15px; border-radius: 12px; margin-bottom: 15px; background: #f8f9fa; }
+        img { width: 100%; max-width: 280px; height: auto; display: none; margin: 15px auto; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        
+        /* Estilos para el Filtro */
+        .filter-section { margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 10px; border: 1px solid #ffeeba; }
+        select { padding: 10px; border-radius: 5px; width: 100%; font-size: 16px; margin-top: 5px; cursor: pointer; }
+        
+        button { background: #28a745; color: white; border: none; padding: 18px; border-radius: 10px; cursor: pointer; font-size: 18px; width: 100%; font-weight: bold; transition: 0.3s; }
+        button:disabled { background: #adb5bd; }
+        .info { font-size: 0.85em; color: #666; margin-top: 10px; }
+        .bn-filter { filter: grayscale(100%) contrast(1.2); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="status" class="status-badge">⚙️ Cargando motor de imagen...</div>
+    <h2>Impresión de Cédula A4</h2>
+    
+    <div class="upload-card">
+        <strong>Lado Frontal</strong><br>
+        <input type="file" id="frontInput" accept="image/*">
+        <img id="frontPreview">
+    </div>
+
+    <div class="upload-card">
+        <strong>Lado Posterior</strong><br>
+        <input type="file" id="backInput" accept="image/*">
+        <img id="backPreview">
+    </div>
+
+    <div class="filter-section">
+        <strong>🎨 Modo de Impresión:</strong>
+        <select id="colorMode">
+            <option value="color">A Color (Original)</option>
+            <option value="bw">Blanco y Negro (Escala de Grises)</option>
+        </select>
+    </div>
+
+    <button id="generateBtn" disabled>Generar e Imprimir PDF</button>
+    <p class="info">Tamaño estándar: 8.5 x 5.5 cm.</p>
+</div>
+
+<canvas id="tempCanvas" style="display:none;"></canvas>
+
+<script>
+    const { jsPDF } = window.jspdf;
+    let scanner;
+    let frontImgData = null;
+    let backImgData = null;
+
+    var Module = {
+        onRuntimeInitialized: function() {
+            scanner = new jscanify();
+            const badge = document.getElementById('status');
+            badge.innerText = "✅ Sistema Listo";
+            badge.style.background = "#28a745";
+        }
+    };
+
+    // Escuchar cambios en el filtro para actualizar la vista previa visualmente
+    document.getElementById('colorMode').onchange = function() {
+        const mode = this.value;
+        const previews = [document.getElementById('frontPreview'), document.getElementById('backPreview')];
+        previews.forEach(img => {
+            if(mode === 'bw') img.classList.add('bn-filter');
+            else img.classList.remove('bn-filter');
+        });
+    };
+
+    async function processImage(input, previewId) {
+        if (!scanner) return alert("Cargando...");
+        const file = input.files[0];
+        if (!file) return;
+
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        
+        img.onload = function() {
+            // Recorte automático con proporción 8.5 x 5.5
+            const resultCanvas = scanner.extractPaper(img, 850, 550); 
+            const preview = document.getElementById(previewId);
+            preview.src = resultCanvas.toDataURL('image/jpeg', 0.9);
+            preview.style.display = 'block';
+
+            if (previewId === 'frontPreview') frontImgData = resultCanvas;
+            else backImgData = resultCanvas;
+
+            if (frontImgData && backImgData) document.getElementById('generateBtn').disabled = false;
+        };
+    }
+
+    document.getElementById('frontInput').onchange = (e) => processImage(e.target, 'frontPreview');
+    document.getElementById('backInput').onchange = (e) => processImage(e.target, 'backPreview');
+
+    // Función para convertir canvas a Blanco y Negro real para el PDF
+    function convertToBW(canvas) {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            data[i]     = avg; // R
+            data[i + 1] = avg; // G
+            data[i + 2] = avg; // B
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    document.getElementById('generateBtn').onclick = function() {
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const isBW = document.getElementById('colorMode').value === 'bw';
+
+        // Procesar imágenes según el filtro seleccionado
+        const finalFront = isBW ? convertToBW(frontImgData) : frontImgData.toDataURL('image/jpeg');
+        const finalBack = isBW ? convertToBW(backImgData) : backImgData.toDataURL('image/jpeg');
+
+        const w = 85; 
+        const h = 55;
+        const xStart = 17.5;
+        const yStart = 30;
+        const gap = 5;
+
+        doc.addImage(finalFront, 'JPEG', xStart, yStart, w, h);
+        doc.addImage(finalBack, 'JPEG', xStart + w + gap, yStart, w, h);
+
+        window.open(doc.output('bloburl'), '_blank');
+    };
+</script>
+
+</body>
+</html>
