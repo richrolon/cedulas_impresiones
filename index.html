@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Cédula A4 - Rich Rolon</title>
+    <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
+    <script src="https://cdn.jsdelivr.net/gh/ColonelParrot/jscanify@master/src/jscanify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .status-badge { background: #ffc107; padding: 5px 15px; border-radius: 20px; font-size: 0.8em; margin-bottom: 20px; display: inline-block; }
+        .upload-section { margin-bottom: 25px; border: 2px dashed #007bff; padding: 20px; border-radius: 15px; transition: 0.3s; }
+        .upload-section:hover { background: #f8fbff; }
+        img { max-width: 100%; height: auto; display: none; margin-top: 15px; border-radius: 8px; border: 1px solid #ddd; }
+        button { background: #28a745; color: white; border: none; padding: 15px 25px; border-radius: 10px; cursor: pointer; font-size: 18px; width: 100%; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        input[type="file"] { margin-top: 10px; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="status" class="status-badge">Cargando Inteligencia Artificial (OpenCV)...</div>
+    <h2>Scanner de Cédula</h2>
+    
+    <div class="upload-section">
+        <strong>📸 Parte Frontal</strong><br>
+        <input type="file" id="frontInput" accept="image/*" capture="camera">
+        <img id="frontPreview">
+    </div>
+
+    <div class="upload-section">
+        <strong>📸 Parte Trasera</strong><br>
+        <input type="file" id="backInput" accept="image/*" capture="camera">
+        <img id="backPreview">
+    </div>
+
+    <button id="generateBtn" disabled>Generar PDF A4 e Imprimir</button>
+</div>
+
+<script>
+    const { jsPDF } = window.jspdf;
+    let scanner;
+    let frontImgData = null;
+    let backImgData = null;
+
+    // Esperar a que OpenCV esté listo
+    var Module = {
+        onRuntimeInitialized: function() {
+            scanner = new jscanify();
+            document.getElementById('status').innerText = "✅ Sistema Listo";
+            document.getElementById('status').style.background = "#d4edda";
+            document.getElementById('status').style.color = "#155724";
+        }
+    };
+
+    async function processImage(input, previewId) {
+        if (!scanner) {
+            alert("Por favor espera a que el sistema cargue por completo.");
+            return;
+        }
+
+        const file = input.files[0];
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        
+        img.onload = function() {
+            // El proceso de "extractPaper" recorta y endereza la cédula automáticamente
+            const resultCanvas = scanner.extractPaper(img, 850, 540); 
+            const preview = document.getElementById(previewId);
+            preview.src = resultCanvas.toDataURL('image/jpeg');
+            preview.style.display = 'block';
+
+            if (previewId === 'frontPreview') frontImgData = preview.src;
+            else backImgData = preview.src;
+
+            if (frontImgData && backImgData) {
+                document.getElementById('generateBtn').disabled = false;
+            }
+        };
+    }
+
+    document.getElementById('frontInput').onchange = (e) => processImage(e.target, 'frontPreview');
+    document.getElementById('backInput').onchange = (e) => processImage(e.target, 'backPreview');
+
+    document.getElementById('generateBtn').onclick = function() {
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const w = 85; 
+        const h = 54;
+        
+        // Posicionamiento horizontal (uno al lado del otro)
+        doc.addImage(frontImgData, 'JPEG', 15, 20, w, h);
+        doc.addImage(backImgData, 'JPEG', 110, 20, w, h);
+
+        // Abrir para impresión
+        window.open(doc.output('bloburl'), '_blank');
+    };
+</script>
+
+</body>
+</html>
