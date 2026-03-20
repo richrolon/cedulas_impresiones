@@ -9,52 +9,55 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #f4f7f6; color: #333; }
-        .container { max-width: 550px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .status-badge { background: #ffc107; padding: 10px; border-radius: 50px; font-size: 0.9em; margin-bottom: 20px; display: inline-block; font-weight: bold; }
-        .upload-card { border: 2px dashed #007bff; padding: 15px; border-radius: 15px; margin-bottom: 15px; background: #fcfdfe; }
-        img { width: 100%; max-width: 300px; display: none; margin: 15px auto; border: 3px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border-radius: 5px; }
-        select, button { width: 100%; padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold; margin-top: 10px; border: 1px solid #ccc; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; transition: 0.3s; }
-        button:disabled { background: #ccc; }
-        .bn-filter { filter: grayscale(100%) contrast(1.2); }
-        .instrucciones { font-size: 0.8em; color: #666; margin-bottom: 15px; text-align: left; background: #eef; padding: 10px; border-radius: 8px; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #f0f2f5; color: #1a1a1a; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .status-badge { background: #6c757d; color: white; padding: 10px 20px; border-radius: 50px; font-size: 0.9em; margin-bottom: 20px; display: inline-block; font-weight: bold; }
+        .upload-card { border: 2px dashed #007bff; padding: 20px; border-radius: 15px; margin-bottom: 15px; background: #f8fbff; cursor: pointer; }
+        .upload-card:active { background: #eef5ff; }
+        img { width: 100%; max-width: 280px; display: none; margin: 15px auto; border: 2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; }
+        
+        select, button { width: 100%; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: bold; margin-top: 10px; border: 1px solid #ddd; outline: none; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; }
+        
+        .instrucciones { font-size: 0.85em; color: #555; margin-bottom: 20px; text-align: left; background: #fff3cd; padding: 12px; border-radius: 10px; border-left: 5px solid #ffc107; }
+        input[type="file"] { display: block; margin: 10px auto; width: 100%; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="status" class="status-badge">⏳ Cargando Inteligencia de Recorte...</div>
-    <h2>Impresión de Cédula</h2>
+    <div id="status" class="status-badge">⏳ Cargando Sistema...</div>
+    <h2>Impresión de Cédula A4</h2>
     
     <div class="instrucciones">
-        💡 <b>Tips para un recorte perfecto:</b><br>
-        1. Coloca la cédula sobre un fondo oscuro (mesa café o negra).<br>
-        2. Evita reflejos de luz directa sobre el plástico.<br>
-        3. Asegúrate de que se vean las 4 esquinas de la tarjeta.
+        📌 <b>Para un recorte perfecto:</b><br>
+        • Coloca la cédula sobre un fondo oscuro.<br>
+        • Al presionar "Seleccionar", elige <b>Cámara</b> para una foto nueva o <b>Galería</b> para una guardada.
     </div>
 
     <div class="upload-card">
-        <strong>Lado Frontal</strong>
+        <strong>📸 Lado Frontal</strong>
         <input type="file" id="frontInput" accept="image/*">
         <img id="frontPreview">
     </div>
 
     <div class="upload-card">
-        <strong>Lado Posterior</strong>
+        <strong>📸 Lado Posterior</strong>
         <input type="file" id="backInput" accept="image/*">
         <img id="backPreview">
     </div>
 
-    <div style="margin: 20px 0;">
-        <strong>🎨 Modo de Color:</strong>
+    <div style="margin: 20px 0; text-align: left;">
+        <label><b>Modo de Impresión:</b></label>
         <select id="colorMode">
             <option value="color">A Color (Original)</option>
-            <option value="bw">Blanco y Negro</option>
+            <option value="bw">Blanco y Negro (Escala de Grises)</option>
         </select>
     </div>
 
-    <button id="generateBtn" disabled>Generar PDF (8.5 x 5.5 cm)</button>
+    <button id="generateBtn" disabled>Generar e Imprimir PDF</button>
 </div>
 
 <script>
@@ -63,19 +66,18 @@
     let frontCanvas = null;
     let backCanvas = null;
 
-    // Inicializar Motor
+    // Inicializar OpenCV y jscanify
     var Module = {
         onRuntimeInitialized: function() {
             scanner = new jscanify();
             const badge = document.getElementById('status');
-            badge.innerText = "✅ Listo para Procesar";
-            badge.style.background = "#d4edda";
-            badge.style.color = "#155724";
+            badge.innerText = "✅ Sistema Listo";
+            badge.style.background = "#28a745";
         }
     };
 
     async function processImage(input, previewId) {
-        if (!scanner) return alert("Cargando procesador...");
+        if (!scanner) return alert("Por favor, espera a que el sistema cargue.");
         const file = input.files[0];
         if (!file) return;
 
@@ -83,71 +85,21 @@
         img.src = URL.createObjectURL(file);
         
         img.onload = function() {
-            // "extractPaper" con parámetros de precisión:
-            // Intentamos detectar el contorno y forzamos resolución alta para el PDF
-            const resultCanvas = scanner.extractPaper(img, 1011, 638); // Proporción técnica ID-1
+            // El motor jscanify detecta el papel y aplica la transformación de perspectiva
+            // Forzamos la proporción estándar de tarjeta de crédito/cédula (ID-1)
+            const resultCanvas = scanner.extractPaper(img, 1011, 638); 
             
             const preview = document.getElementById(previewId);
-            preview.src = resultCanvas.toDataURL('image/jpeg', 1.0);
+            preview.src = resultCanvas.toDataURL('image/jpeg', 0.9);
             preview.style.display = 'block';
 
             if (previewId === 'frontPreview') frontCanvas = resultCanvas;
             else backCanvas = resultCanvas;
 
-            if (frontCanvas && backCanvas) document.getElementById('generateBtn').disabled = false;
+            if (frontCanvas && backCanvas) {
+                document.getElementById('generateBtn').disabled = false;
+            }
         };
     }
 
-    document.getElementById('frontInput').onchange = (e) => processImage(e.target, 'frontPreview');
-    document.getElementById('backInput').onchange = (e) => processImage(e.target, 'backPreview');
-
-    // Función para convertir a Blanco y Negro real
-    function applyBW(canvas) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        const ctx = tempCanvas.getContext('2d');
-        ctx.drawImage(canvas, 0, 0);
-        
-        const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const gray = data[i] * 0.3 + data[i+1] * 0.59 + data[i+2] * 0.11;
-            data[i] = data[i+1] = data[i+2] = gray;
-        }
-        ctx.putImageData(imageData, 0, 0);
-        return tempCanvas.toDataURL('image/jpeg', 0.9);
-    }
-
-    document.getElementById('generateBtn').onclick = function() {
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const isBW = document.getElementById('colorMode').value === 'bw';
-
-        const finalFront = isBW ? applyBW(frontCanvas) : frontCanvas.toDataURL('image/jpeg', 1.0);
-        const finalBack = isBW ? applyBW(backCanvas) : backCanvas.toDataURL('image/jpeg', 1.0);
-
-        // Medidas exactas solicitadas (85mm x 55mm)
-        const w = 85; 
-        const h = 55;
-        const xStart = 17.5; // Centrado en A4
-        const yStart = 40;
-        const gap = 5;
-
-        doc.addImage(finalFront, 'JPEG', xStart, yStart, w, h);
-        doc.addImage(finalBack, 'JPEG', xStart + w + gap, yStart, w, h);
-
-        window.open(doc.output('bloburl'), '_blank');
-    };
-
-    // Actualizar vista previa visualmente al cambiar modo
-    document.getElementById('colorMode').onchange = function() {
-        const previews = [document.getElementById('frontPreview'), document.getElementById('backPreview')];
-        previews.forEach(p => {
-            if(this.value === 'bw') p.classList.add('bn-filter');
-            else p.classList.remove('bn-filter');
-        });
-    };
-</script>
-
-</body>
-</html>
+    document.getElementById('
