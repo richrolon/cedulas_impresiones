@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador PDF Cédula - Rich Rolon</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #f4f7f6; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .upload-card { border: 2px solid #007bff; padding: 15px; border-radius: 15px; margin-bottom: 15px; background: #fcfdfe; }
+        img { width: 100%; max-width: 250px; display: none; margin: 15px auto; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        select, button { width: 100%; padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold; margin-top: 10px; border: 1px solid #ccc; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; transition: 0.3s; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .bn-filter { filter: grayscale(100%); }
+        .info { font-size: 0.85em; color: #666; margin-top: 10px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Impresión de Cédula A4</h2>
+    <p class="info">Sube las fotos ya recortadas. El sistema las ajustará automáticamente a <b>8.5 x 5.5 cm</b>.</p>
+
+    <div class="upload-card">
+        <strong>📸 Lado Frontal</strong>
+        <input type="file" id="frontInput" accept="image/*">
+        <img id="frontPreview">
+    </div>
+
+    <div class="upload-card">
+        <strong>📸 Lado Posterior</strong>
+        <input type="file" id="backInput" accept="image/*">
+        <img id="backPreview">
+    </div>
+
+    <div style="margin: 20px 0; text-align: left;">
+        <label><b>Modo de Impresión:</b></label>
+        <select id="colorMode">
+            <option value="color">A Color</option>
+            <option value="bw">Blanco y Negro</option>
+        </select>
+    </div>
+
+    <button id="generateBtn" disabled>Generar PDF A4</button>
+</div>
+
+<canvas id="procCanvas" style="display:none;"></canvas>
+
+<script>
+    const { jsPDF } = window.jspdf;
+    let frontImg = null;
+    let backImg = null;
+
+    // Función para leer y mostrar la imagen subida
+    function handleFile(input, previewId) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById(previewId);
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            
+            if (previewId === 'frontPreview') frontImg = e.target.result;
+            else backImg = e.target.result;
+
+            if (frontImg && backImg) document.getElementById('generateBtn').disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('frontInput').onchange = (e) => handleFile(e.target, 'frontPreview');
+    document.getElementById('backInput').onchange = (e) => handleFile(e.target, 'backPreview');
+
+    // Cambiar vista previa visualmente
+    document.getElementById('colorMode').onchange = function() {
+        const previews = [document.getElementById('frontPreview'), document.getElementById('backPreview')];
+        previews.forEach(p => {
+            if(this.value === 'bw') p.classList.add('bn-filter');
+            else p.classList.remove('bn-filter');
+        });
+    };
+
+    // Función para convertir a Blanco y Negro real antes de ir al PDF
+    async function getProcessedImage(base64, isBW) {
+        if (!isBW) return base64;
+
+        return
