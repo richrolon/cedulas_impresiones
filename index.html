@@ -132,32 +132,29 @@
         });
     }
 
-    document.getElementById('generateBtn').onclick = async function() {
-        this.innerText = "Procesando...";
-        this.disabled = true;
+document.getElementById('generateBtn').onclick = async function() {
+    this.innerText = "Procesando...";
+    const isBW = document.getElementById('colorMode').value === 'bw';
+    
+    const finalFront = isBW ? await procesarImagenBN(frontImgBase64) : frontImgBase64;
+    const finalBack = isBW ? await procesarImagenBN(backImgBase64) : backImgBase64;
 
-        const isBW = document.getElementById('colorMode').value === 'bw';
-        
-        // Procesamos las imágenes según la elección
-        const finalFront = isBW ? await procesarImagenBN(frontImgBase64) : frontImgBase64;
-        const finalBack = isBW ? await procesarImagenBN(backImgBase64) : backImgBase64;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    doc.addImage(finalFront, 'JPEG', 17.5, 40, 85, 55);
+    doc.addImage(finalBack, 'JPEG', 107.5, 40, 85, 55);
 
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const w = 85; 
-        const h = 55;
-        const xStart = 17.5;
-        const yStart = 40;
-        const gap = 5;
-
-        doc.addImage(finalFront, 'JPEG', xStart, yStart, w, h);
-        doc.addImage(finalBack, 'JPEG', xStart + w + gap, yStart, w, h);
-
+    // MÉTODO COMPATIBLE CON IPHONE:
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        // En iOS, abrimos el PDF en una nueva pestaña para que Safari lo gestione
+        const pdfData = doc.output('bloburl');
+        window.location.href = pdfData; 
+    } else {
+        // En Android/PC, descargamos directamente
         doc.save("cedula_impresion.pdf");
-        
-        this.innerText = "Generar PDF A4";
-        this.disabled = false;
-    };
-
+    }
+    
+    this.innerText = "Generar PDF A4";
+};
     // Filtro visual en pantalla
     document.getElementById('colorMode').onchange = function() {
         const previews = [document.getElementById('frontPreview'), document.getElementById('backPreview')];
